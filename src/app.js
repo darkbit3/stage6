@@ -77,6 +77,15 @@ let dbManagerConnected = false;
 let dbManagerSocket = null;
 let realtimeConnected = false;
 
+const {
+  getRoomCountdown,
+  resetRoomCountdown,
+  decrementCountdowns,
+  setRoomCountdown,
+  getAllCountdowns,
+  DEFAULT_COUNTDOWN_SECONDS
+} = require('./countdownManager');
+
 // Check service connections
 const checkServiceConnections = async () => {
   try {
@@ -419,6 +428,38 @@ function parseSelectedBoard(selectedBoard) {
   }
 }
 
+// Room countdown endpoint
+app.get('/api/v1/room-countdown', (req, res) => {
+  try {
+    const room = req.query.room;
+    
+    if (!room || (room !== '1' && room !== '2')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid room parameter. Must be 1 or 2'
+      });
+    }
+
+    const countdownData = getRoomCountdown(room);
+    
+    res.json({
+      success: true,
+      data: {
+        room: parseInt(room),
+        countdown: countdownData.seconds,
+        active: countdownData.active
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error fetching room countdown:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -482,6 +523,11 @@ server.listen(PORT, async () => {
 
   // Check connections every 30 seconds
   setInterval(checkServiceConnections, 30000);
+
+  // Decrement countdowns every second
+  setInterval(() => {
+    decrementCountdowns();
+  }, 1000);
 });
 
 module.exports = { app, server, io };
